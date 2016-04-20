@@ -1,0 +1,117 @@
+---
+title: "Regression Models Course Project"
+author: "Lefteris Nikolidakis"
+date: "Wednesday, July 23, 2014"
+output: 
+  html_document: 
+    keep_md: yes
+---
+
+## Executive Summary
+A study of automobile miles per gallon (MPG) performance was conducted for Motor Trend magazine. The objective of the study was to understand which automobile related factors had an effect on MPG performance and specifically, which type of transmission was better for MPG. The study utilized linear regression to explore the relationship between MPG and various other factors, including transmission. While initial univariate analysis of the data indicated that manual transmissions were better for MPG, a deeper multivariate regression analysis discovered that MPG was most highly correlated with weight and horsepower, while the choice of transmission was not a significant factor in determining MPG.
+
+## Research Question
+The goal of this study, was to explore the relationship between multiple variables related to automobile design and performance, and MPG. More specifically, we wanted to know which type of transmission, automatic or manual, was better for MPG?
+
+## Data
+The data used for this analysis was obtained from the 1974 _Motor Trend_ US magazine. The data set contained 11 variables (including MPG) describing various aspects of automobile design and performance for 32 automobiles (1973-74 models). 
+
+Below is a description of each variable in the data set:
+
+- `mpg`         Miles/(US) gallon 
+- `cyl` Number of cylinders 
+- `disp` Displacement (cu.in.) 
+- `hp` Gross horsepower 
+- `drat` Rear axle ratio 
+- `wt` Weight (lb/1000)
+- `qsec` 1/4 mile time 
+- `vs`  V engine or a Straight engine (binary) 
+- `am` Automatic or Manual Transmission (binary)
+- `gear` Number of forward gears 
+- `carb`	 Number of carburetors
+
+Beloaw are the first 10 rows of the `mtcars` dataframe:
+```{r echo=FALSE}
+head(mtcars)
+```
+
+
+## Exploratory Analysis
+
+To understand the relationship between the variables in the data set and MPG, some exploratory analysis of the data will be conducted. 
+
+The Violin plot below clearly shows that there was a difference in MPG depending on transmission type. Automobiles with a manual transmission had a higher MPG than those with an automatic one. In fact, when looking at the data by transmission type, the average MPG for a manual transmission car was `r round(mean(subset(mtcars, mtcars$am == 1)), 2)`, while the MPG for an automatic transmission was an average of `r round(mean(subset(mtcars, mtcars$am == 0)), 2)`. 
+
+```{r echo=FALSE, message=FALSE, fig.width=6, fig.height=4}
+mtcars_test <- mtcars
+mtcars_test$am <- factor(mtcars_test$am, labels=c("Automatic", "Manual"))
+
+require(ggplot2)
+ggplot(data=mtcars_test, aes(y = mpg, x = am)) + geom_violin(alpha=0.7, color="gray")+geom_jitter(alpha=0.7, aes(color=am), position = position_jitter(width = 0.2)) + xlab("Transmission") + ylab("Miles per Gallon") + ggtitle("Violin plot for MPG per transmission type") + scale_color_discrete(guide = FALSE)
+```
+
+The correlation matrix below shows the linear relationship between all variables with the two binary - `am` and `vs` excluded. 
+`Mpg` was the most highly correlated with `weight` (-0.87), the number of `cylinders` (-0.85), `displacement` (-0.85), and `horsepower` (-0.78). These were all negative correlations, meaning they had a negative impact on MPG levels.
+
+Also we notice strong lineral relationships between most of the explanatory variables. TO avoid collinearity these associations should be considered before fitting our multivariate model. 
+
+```{r, echo=FALSE, message=FALSE, fig.width=6, fig.height=4}
+library(plotrix)
+correlations <- round(cor(mtcars_test[,-c(8,9)]),2)
+
+color2D.matplot(correlations, show.values = 2, axes=FALSE, xlab="",ylab="")
+axis(1,at=c(seq(from=0.5,to=8.5,by=1)),labels=colnames(correlations), cex.axis=0.8)
+axis(2,at=c(seq(from=0.5,to=8.5,by=1)),labels=rev(colnames(correlations)), las=2, cex.axis=0.8)
+```
+
+Lastly the 2nd violin plot below illustrates the relationship between our variable of interest `mpg` and the binary  variable `vs`, suggesting that automobiles with V engines had a higher MPG than those with an Straight engine.
+
+```{r VS, echo=FALSE, message=FALSE, fig.width=6, fig.height=4}
+mtcars_test$vs <- factor(mtcars_test$vs, labels=c("V Engine", "Straight Engine"))
+
+ggplot(data=mtcars_test, aes(y = mpg, x = vs)) + geom_violin(alpha=0.7, color="gray")+geom_jitter(alpha=0.7, aes(color=vs), position = position_jitter(width = 0.2)) + xlab("vs") + ylab("Miles per Gallon") + ggtitle("Violin plot for MPG per VS") + scale_color_discrete(guide = FALSE)
+```
+
+
+## Statistical Modeling
+
+The exploratory analysis of the *Motor Trend* data showed that there is evidence to suggest that a linear relationship exists between automobile `MPG` and several variables in the data set, including transmission. 
+
+To address the main research question of the relationship between `MPG` and `transmission` type, I run an independent 2-group t-test with MPG as the numeric variable and transmission as the binary factor. The p-value of the t-test is equal with  0.0013 and is below the critical value a = 0.05; also the t statistic is negative, therefore we conclude that the automobiles with maunual Transmission consume signicantly more gallons per mile on average than the automobiles with automatic Transmission.
+
+```{r echo=FALSE, message=FALSE}
+t.test(mpg ~ am, mtcars_test)
+```
+
+### Multivariate Model selection with Backward-Elimination
+
+For the analysis, we fit regression models to identify variables which are associated with mpg. We will use the stepwise selection method to retain significant variables in the multivariable regression model, and remove variables which are not.
+
+We start with the full model including all potential predictor variables. However, instead of listing out the details of each step of eliminating variables with the largest p-values one by one, we let the software automatically do those steps and return us the best model, using the **step** function as below:
+
+```{r echo=TRUE, results="hide"}
+fit <- lm(mpg ~ ., data=mtcars_test)
+best_fit <- step(fit, direction="backward")
+```
+We then get a summary of the best model. We see that all of the variables remain have very low p-values (less than 0.05), and we cannot remove any more variables from this model. The *adjusted R-squared value* shows that this model can explain `r round(summary(best_fit)$adj.r.squared*100, digits=2)` percent of the variance in the response (mpg).
+
+```{r echo=FALSE, message=FALSE}
+summary(best_fit)
+```
+
+The variance inflation factors (VIFs) below measure how much the variance (the square of the estimate's standard deviation) of each estimated regression coefficient is increased because of collinearity. Since all VIFs are quite low (less than 3), we are confident that none of the predictors in our fitted model are correlated with each other. 
+
+```{r echo=FALSE, message=FALSE}
+require(car)
+vif(best_fit)
+```
+
+## Diagnositc Plots
+
+```{r echo=FALSE, message=FALSE}
+par(mfrow = c(2, 2))
+require(ggfortify)
+autoplot(best_fit)
+```
+
+
